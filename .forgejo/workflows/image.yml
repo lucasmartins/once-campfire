@@ -14,7 +14,8 @@ permissions: {}
 
 env:
   REGISTRY: git.hut.techleads.com.br
-  IMAGE_NAME: AeonSoftware/once-campfire
+  # Registry repository names must be lowercase.
+  IMAGE_NAME: aeonsoftware/once-campfire
 
 jobs:
   image:
