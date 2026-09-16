@@ -22,10 +22,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      # No external actions/checkout: Galaxy runners cannot reach
+      # data.forgejo.org (TLS timeout), so clone straight from our own
+      # Forgejo instance, which is reachable via the runner extra_hosts
+      # mapping (git.hut.techleads.com.br -> 169.254.1.2).
+      - name: Checkout (no external action)
+        shell: bash
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          set -eu
+          git clone --depth 1 --branch "${GITHUB_REF_NAME}" "$REPO_URL" .
+          git checkout -q "$GITHUB_SHA"
+          git rev-parse --short HEAD
 
       - name: Ensure podman is available
         shell: bash
