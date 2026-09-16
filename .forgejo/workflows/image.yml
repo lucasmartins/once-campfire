@@ -70,6 +70,7 @@ jobs:
           # on the host Podman socket --iidfile alone came back empty (runs
           # 11/12), which produced the invalid ref "sha256:" at docker tag.
           BUILD_ID="$(docker build -q \
+            --load \
             --iidfile "$IID_FILE" \
             --file Dockerfile \
             --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
