@@ -12,12 +12,26 @@ class WebhookTest < ActiveSupport::TestCase
     WebMock.stub_request(:post, webhooks(:bender).url).
       with(body: hash_including(
         user: { id: message.creator.id, name: message.creator.name },
-        room: { id: message.room.id, name: message.room.name, path: bot_messages_path },
+        room: { id: message.room.id, name: message.room.name, path: bot_messages_path, direct: false },
         message: { id: message.id, body: { html: "First post!", plain: "First post!" }, path: message_path, attachments: [] },
       ))
 
     response = webhooks(:bender).deliver(messages(:first))
     assert_equal 200, response.code.to_i
+  end
+
+  test "payload in a direct room includes direct true" do
+    message = rooms(:bender_and_kevin).messages.create!(body: "Direct hello", creator: users(:bender))
+
+    payload = nil
+    WebMock.stub_request(:post, webhooks(:bender).url).
+      with { |request| payload = JSON.parse(request.body) }.
+      to_return(status: 200, body: "", headers: {})
+
+    response = webhooks(:bender).deliver(message)
+    assert_equal 200, response.code.to_i
+
+    assert_equal true, payload["room"]["direct"]
   end
 
   test "payload with attachment includes attachment metadata and no bot key" do

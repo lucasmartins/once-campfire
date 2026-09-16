@@ -41,7 +41,7 @@ class Webhook < ApplicationRecord
     def payload(message)
       {
         user:    { id: message.creator.id, name: message.creator.name },
-        room:    { id: message.room.id, name: message.room.name, path: room_bot_messages_path(message) },
+        room:    { id: message.room.id, name: message.room.name, path: room_bot_messages_path(message), direct: message.room.direct? },
         message: { id: message.id, body: { html: message.body.body, plain: without_recipient_mentions(message.plain_text_body) }, path: message_path(message), attachments: attachments_metadata(message) }
       }.to_json
     end
