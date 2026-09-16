@@ -69,6 +69,8 @@ Rails.application.routes.draw do
         end
 
         get "messages/:id/attachment", to: "messages/attachments/by_bots#show", as: :message_attachment
+
+        post "indicators/:kind", to: "bot/indicators#create", as: :bot_indicators
       end
     end
 

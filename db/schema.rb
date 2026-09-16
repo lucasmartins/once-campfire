@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.2].define(version: 2025_12_12_154340) do
+ActiveRecord::Schema[8.2].define(version: 2026_09_16_120000) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "custom_styles"
@@ -77,6 +77,19 @@ ActiveRecord::Schema[8.2].define(version: 2025_12_12_154340) do
     t.datetime "updated_at", null: false
     t.index ["booster_id"], name: "index_boosts_on_booster_id"
     t.index ["message_id"], name: "index_boosts_on_message_id"
+  end
+
+  create_table "bot_indicators", force: :cascade do |t|
+    t.integer "bot_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.string "kind", null: false
+    t.integer "room_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bot_id"], name: "index_bot_indicators_on_bot_id"
+    t.index ["expires_at"], name: "index_bot_indicators_on_expires_at"
+    t.index ["room_id", "bot_id", "kind"], name: "index_bot_indicators_on_room_id_and_bot_id_and_kind", unique: true
+    t.index ["room_id"], name: "index_bot_indicators_on_room_id"
   end
 
   create_table "memberships", force: :cascade do |t|
@@ -170,6 +183,8 @@ ActiveRecord::Schema[8.2].define(version: 2025_12_12_154340) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "bans", "users"
   add_foreign_key "boosts", "messages"
+  add_foreign_key "bot_indicators", "rooms", on_delete: :cascade
+  add_foreign_key "bot_indicators", "users", column: "bot_id", on_delete: :cascade
   add_foreign_key "messages", "rooms"
   add_foreign_key "messages", "users", column: "creator_id"
   add_foreign_key "push_subscriptions", "users"
