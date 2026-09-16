@@ -18,47 +18,33 @@ env:
 
 jobs:
   image:
-    name: Build image with podman
+    name: Build image on the host Podman socket
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      # No external actions/checkout: Galaxy runners cannot reach
-      # data.forgejo.org (TLS timeout), so clone straight from our own
-      # Forgejo instance, which is reachable via the runner extra_hosts
-      # mapping (git.hut.techleads.com.br -> 169.254.1.2).
-      - name: Checkout (no external action)
+      # No external actions: Galaxy runners cannot reach data.forgejo.org
+      # (TLS timeout), so clone from our own Forgejo with the job token.
+      # The job container talks to the HOST rootless Podman through the
+      # runner-mounted /var/run/docker.sock — no DinD, no apt install.
+      - name: Checkout (git, job token)
         shell: bash
         env:
-          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          JOB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          git clone --depth 1 --branch "${GITHUB_REF_NAME}" "$REPO_URL" .
+          repo_host="${GITHUB_SERVER_URL#https://}"
+          git clone --depth 1 --branch "${GITHUB_REF_NAME}" \
+            "https://x-access-token:${JOB_TOKEN}@${repo_host}/${GITHUB_REPOSITORY}.git" .
           git checkout -q "$GITHUB_SHA"
           git rev-parse --short HEAD
 
-      - name: Ensure podman is available
+      - name: Verify container CLI and socket
         shell: bash
         run: |
           set -eu
-          if ! command -v podman >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends podman
-          fi
-          podman --version
-
-      - name: Build image
-        shell: bash
-        run: |
-          set -eu
-          podman build \
-            --file Dockerfile \
-            --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
-            --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" \
-            --build-arg APP_VERSION="${GITHUB_SHA::7}" \
-            --build-arg GIT_REVISION="${GITHUB_SHA}" \
-            --build-arg OCI_SOURCE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --build-arg OCI_DESCRIPTION="Campfire is a web-based chat application with rooms, direct messages, file attachments, search, and bot integrations." \
-            .
+          command -v docker >/dev/null || { echo "docker CLI missing in runner image"; exit 1; }
+          docker version --format '{{.Server.Version}}' >/dev/null
+          docker info --format 'storage={{.Driver}} server={{.ServerVersion}}'
 
       - name: Log in to the container registry (only when REGISTRY_TOKEN is set)
         shell: bash
@@ -68,10 +54,24 @@ jobs:
         run: |
           set -eu
           if [ -n "${REGISTRY_TOKEN:-}" ]; then
-            printf '%s' "$REGISTRY_TOKEN" | podman login "$REGISTRY" --username "${REGISTRY_USER:-$GITHUB_ACTOR}" --password-stdin
+            printf '%s' "$REGISTRY_TOKEN" | docker login "$REGISTRY" --username "${REGISTRY_USER:-$GITHUB_ACTOR}" --password-stdin
           else
             echo "::warning::REGISTRY_TOKEN is not set - skipping registry login and push (build-only run)."
           fi
+
+      - name: Build image
+        shell: bash
+        run: |
+          set -eu
+          docker build \
+            --file Dockerfile \
+            --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
+            --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" \
+            --build-arg APP_VERSION="${GITHUB_SHA::7}" \
+            --build-arg GIT_REVISION="${GITHUB_SHA}" \
+            --build-arg OCI_SOURCE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --build-arg OCI_DESCRIPTION="Campfire is a web-based chat application with rooms, direct messages, file attachments, search, and bot integrations." \
+            .
 
       - name: Push image (skipped when REGISTRY_TOKEN is not set)
         shell: bash
@@ -80,24 +80,28 @@ jobs:
         run: |
           set -eu
           if [ -n "${REGISTRY_TOKEN:-}" ]; then
-            podman push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
-            podman push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
+            docker push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
+            docker push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
           else
-            echo "::warning::REGISTRY_TOKEN is not set - skipping podman push."
+            echo "::warning::REGISTRY_TOKEN is not set - skipping docker push."
           fi
 
       - name: Print image digest
         shell: bash
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -eu
           IMAGE="${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
-          DIGEST="$(podman image inspect --format '{{ .Digest }}' "$IMAGE" 2>/dev/null || true)"
-          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
-            echo "::warning::image inspect returned no manifest digest; falling back to podman push --digestfile"
-            DIGESTFILE="$(mktemp)"
-            podman push --digestfile "$DIGESTFILE" "$IMAGE" "dir:$(mktemp -d)"
-            DIGEST="$(cat "$DIGESTFILE")"
-            rm -f "$DIGESTFILE"
+          if [ -n "${REGISTRY_TOKEN:-}" ]; then
+            # RepoDigests is populated by the push above.
+            DIGEST="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" | grep -o 'sha256:[0-9a-f]*' | head -n1 || true)"
+          else
+            DIGEST=""
+          fi
+          if [ -z "${DIGEST:-}" ]; then
+            echo "::warning::no registry digest available (build-only run or push skipped); printing local image id instead."
+            DIGEST="$(docker image inspect --format '{{.Id}}' "$IMAGE")"
           fi
           case "$DIGEST" in
             sha256:*) ;;
@@ -108,4 +112,4 @@ jobs:
       - name: Remove local image
         if: always()
         shell: bash
-        run: podman image rm "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" || true
+        run: docker image rm "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" || true
