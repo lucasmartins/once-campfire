@@ -1,0 +1,102 @@
+name: Build and push container image (Forgejo Actions)
+
+on:
+  push:
+    branches:
+      - main
+      - feat/bot-indicators
+
+concurrency:
+  group: image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  REGISTRY: git.hut.techleads.com.br
+  IMAGE_NAME: AeonSoftware/once-campfire
+
+jobs:
+  image:
+    name: Build image with podman
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Ensure podman is available
+        shell: bash
+        run: |
+          set -eu
+          if ! command -v podman >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends podman
+          fi
+          podman --version
+
+      - name: Build image
+        shell: bash
+        run: |
+          set -eu
+          podman build \
+            --file Dockerfile \
+            --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
+            --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" \
+            --build-arg APP_VERSION="${GITHUB_SHA::7}" \
+            --build-arg GIT_REVISION="${GITHUB_SHA}" \
+            --build-arg OCI_SOURCE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --build-arg OCI_DESCRIPTION="Campfire is a web-based chat application with rooms, direct messages, file attachments, search, and bot integrations." \
+            .
+
+      - name: Log in to the container registry (only when REGISTRY_TOKEN is set)
+        shell: bash
+        env:
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          set -eu
+          if [ -n "${REGISTRY_TOKEN:-}" ]; then
+            printf '%s' "$REGISTRY_TOKEN" | podman login "$REGISTRY" --username "${REGISTRY_USER:-$GITHUB_ACTOR}" --password-stdin
+          else
+            echo "::warning::REGISTRY_TOKEN is not set - skipping registry login and push (build-only run)."
+          fi
+
+      - name: Push image (skipped when REGISTRY_TOKEN is not set)
+        shell: bash
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          set -eu
+          if [ -n "${REGISTRY_TOKEN:-}" ]; then
+            podman push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
+            podman push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
+          else
+            echo "::warning::REGISTRY_TOKEN is not set - skipping podman push."
+          fi
+
+      - name: Print image digest
+        shell: bash
+        run: |
+          set -eu
+          IMAGE="${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
+          DIGEST="$(podman image inspect --format '{{ .Digest }}' "$IMAGE" 2>/dev/null || true)"
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "::warning::image inspect returned no manifest digest; falling back to podman push --digestfile"
+            DIGESTFILE="$(mktemp)"
+            podman push --digestfile "$DIGESTFILE" "$IMAGE" "dir:$(mktemp -d)"
+            DIGEST="$(cat "$DIGESTFILE")"
+            rm -f "$DIGESTFILE"
+          fi
+          case "$DIGEST" in
+            sha256:*) ;;
+            *) DIGEST="sha256:${DIGEST}" ;;
+          esac
+          echo "IMAGE_DIGEST=${DIGEST}"
+
+      - name: Remove local image
+        if: always()
+        shell: bash
+        run: podman image rm "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" || true
