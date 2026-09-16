@@ -107,6 +107,24 @@ class Bot::IndicatorsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "posting typing broadcasts start" do
+    assert_broadcasts TypingNotificationsChannel.broadcasting_for(@room), 1 do
+      post room_bot_bot_indicators_url(@room, @bot_key, :typing), headers: @headers
+    end
+
+    assert_equal({ "action" => "start", "user" => users(:bender).slice(:id, :name).stringify_keys, "kind" => "typing" },
+      last_broadcast_for(@room))
+  end
+
+  test "posting thinking broadcasts thinking" do
+    assert_broadcasts TypingNotificationsChannel.broadcasting_for(@room), 1 do
+      post room_bot_bot_indicators_url(@room, @bot_key, :thinking), headers: @headers
+    end
+
+    assert_equal({ "action" => "thinking", "user" => users(:bender).slice(:id, :name).stringify_keys, "kind" => "thinking" },
+      last_broadcast_for(@room))
+  end
+
   test "a sweep racing a refresh leaves the refreshed indicator alone" do
     freeze_time do
       post room_bot_bot_indicators_url(@room, @bot_key, :typing), params: { ttl: 5 }.to_json, headers: @headers

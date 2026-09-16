@@ -55,6 +55,14 @@ class Bot::Indicator < ApplicationRecord
     end
   end
 
+  def broadcast_start
+    # "typing" rides the same "start" action humans broadcast; "thinking" gets
+    # its own action so the room UI can tell the two hints apart.
+    action = kind == "thinking" ? :thinking : :start
+    TypingNotificationsChannel.broadcast_to room,
+      action: action, user: bot.slice(:id, :name), kind: kind
+  end
+
   def broadcast_stop
     TypingNotificationsChannel.broadcast_to room,
       action: :stop, user: bot.slice(:id, :name), kind: kind

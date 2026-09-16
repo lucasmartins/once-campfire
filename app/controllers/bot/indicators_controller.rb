@@ -6,7 +6,8 @@ class Bot::IndicatorsController < ApplicationController
 
   def create
     ttl = Bot::Indicator.clamp_ttl(params[:ttl])
-    Bot::Indicator.refresh(@room, Current.user, @kind, ttl: ttl)
+    indicator = Bot::Indicator.refresh(@room, Current.user, @kind, ttl: ttl)
+    indicator.broadcast_start
     Bot::Indicators::SweepJob.perform_later
 
     head :no_content
