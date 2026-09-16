@@ -67,6 +67,8 @@ Rails.application.routes.draw do
         resources :messages, controller: "messages/by_bots", only: %i[ index create update destroy ] do
           resources :boosts, controller: "messages/boosts/by_bots", only: %i[ create destroy ]
         end
+
+        get "messages/:id/attachment", to: "messages/attachments/by_bots#show", as: :message_attachment
       end
     end
 

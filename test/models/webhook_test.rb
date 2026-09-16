@@ -1,6 +1,9 @@
 require "test_helper"
 
 class WebhookTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+  include ActionDispatch::TestProcess
+
   test "payload" do
     message = messages(:first)
     message_path = Rails.application.routes.url_helpers.room_at_message_path(message.room, message)
@@ -10,11 +13,46 @@ class WebhookTest < ActiveSupport::TestCase
       with(body: hash_including(
         user: { id: message.creator.id, name: message.creator.name },
         room: { id: message.room.id, name: message.room.name, path: bot_messages_path },
-        message: { id: message.id, body: { html: "First post!", plain: "First post!" }, path: message_path },
+        message: { id: message.id, body: { html: "First post!", plain: "First post!" }, path: message_path, attachments: [] },
       ))
 
     response = webhooks(:bender).deliver(messages(:first))
     assert_equal 200, response.code.to_i
+  end
+
+  test "payload with attachment includes attachment metadata and no bot key" do
+    message = create_attachment_message
+    message_path = Rails.application.routes.url_helpers.room_at_message_path(message.room, message)
+
+    payload = nil
+    WebMock.stub_request(:post, webhooks(:bender).url).
+      with { |request| payload = JSON.parse(request.body) }.
+      to_return(status: 200, body: "", headers: {})
+
+    response = webhooks(:bender).deliver(message)
+    assert_equal 200, response.code.to_i
+
+    assert_equal [ {
+      "id"           => message.attachment.blob.id,
+      "filename"     => "moon.jpg",
+      "content_type" => "image/jpeg",
+      "byte_size"    => message.attachment.byte_size
+    } ], payload["message"]["attachments"]
+
+    assert_not_includes payload["message"]["attachments"].to_json, users(:bender).bot_key
+  end
+
+  test "payload without attachment includes no bot key" do
+    payload = nil
+    WebMock.stub_request(:post, webhooks(:bender).url).
+      with { |request| payload = JSON.parse(request.body) }.
+      to_return(status: 200, body: "", headers: {})
+
+    response = webhooks(:bender).deliver(messages(:first))
+    assert_equal 200, response.code.to_i
+
+    assert_equal [], payload["message"]["attachments"]
+    assert_not_includes payload["message"]["attachments"].to_json, users(:bender).bot_key
   end
 
   test "delivery" do
@@ -53,4 +91,12 @@ class WebhookTest < ActiveSupport::TestCase
     reply_message = Message.last
     assert_equal "Failed to respond within 7 seconds", reply_message.body.to_plain_text
   end
+
+  private
+    def create_attachment_message
+      messages(:first).room.messages.create_with_attachment! \
+        creator: users(:jason),
+        client_message_id: "attachment-payload",
+        attachment: fixture_file_upload("moon.jpg", "image/jpeg")
+    end
 end

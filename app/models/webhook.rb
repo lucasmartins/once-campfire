@@ -42,8 +42,16 @@ class Webhook < ApplicationRecord
       {
         user:    { id: message.creator.id, name: message.creator.name },
         room:    { id: message.room.id, name: message.room.name, path: room_bot_messages_path(message) },
-        message: { id: message.id, body: { html: message.body.body, plain: without_recipient_mentions(message.plain_text_body) }, path: message_path(message) }
+        message: { id: message.id, body: { html: message.body.body, plain: without_recipient_mentions(message.plain_text_body) }, path: message_path(message), attachments: attachments_metadata(message) }
       }.to_json
+    end
+
+    # Metadata only: never the bot_key, signed blob URLs, or disk paths.
+    def attachments_metadata(message)
+      return [] unless message.attachment?
+
+      blob = message.attachment.blob
+      [ { id: blob.id, filename: blob.filename.to_s, content_type: blob.content_type, byte_size: blob.byte_size } ]
     end
 
     def message_path(message)
