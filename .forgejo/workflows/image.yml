@@ -64,7 +64,9 @@ jobs:
         shell: bash
         run: |
           set -eu
+          IID_FILE="${RUNNER_TEMP}/image-id"
           docker build \
+            --iidfile "$IID_FILE" \
             --file Dockerfile \
             --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
             --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" \
@@ -73,6 +75,18 @@ jobs:
             --build-arg OCI_SOURCE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             --build-arg OCI_DESCRIPTION="Campfire is a web-based chat application with rooms, direct messages, file attachments, search, and bot integrations." \
             .
+          # Capture the image id straight from the build (--iidfile) instead
+          # of trusting the build-time tags to stick on the host Podman API.
+          IMAGE_ID="$(tr -d ' \r\n' < "$IID_FILE")"
+          case "$IMAGE_ID" in
+            sha256:*) ;;
+            *) IMAGE_ID="sha256:${IMAGE_ID}" ;;
+          esac
+          printf '%s\n' "$IMAGE_ID" > "$IID_FILE"
+          # Re-tag from the captured id so later steps never depend on the
+          # build-time tags.
+          docker tag "$IMAGE_ID" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
+          docker tag "$IMAGE_ID" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
 
       - name: Push image (skipped when REGISTRY_TOKEN is not set)
         shell: bash
@@ -93,16 +107,23 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -eu
+          IID_FILE="${RUNNER_TEMP}/image-id"
+          IMAGE_ID="$(tr -d ' \r\n' < "$IID_FILE")"
+          case "$IMAGE_ID" in
+            sha256:*) ;;
+            *) IMAGE_ID="sha256:${IMAGE_ID}" ;;
+          esac
           IMAGE="${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
+          DIGEST=""
           if [ -n "${REGISTRY_TOKEN:-}" ]; then
             # RepoDigests is populated by the push above.
             DIGEST="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" | grep -o 'sha256:[0-9a-f]*' | head -n1 || true)"
-          else
-            DIGEST=""
           fi
-          if [ -z "${DIGEST:-}" ]; then
+          if [ -z "$DIGEST" ]; then
+            # Build-only run (REGISTRY_TOKEN unset or push skipped): use the
+            # image id captured from docker build --iidfile, no tag lookup.
             echo "::warning::no registry digest available (build-only run or push skipped); printing local image id instead."
-            DIGEST="$(docker image inspect --format '{{.Id}}' "$IMAGE")"
+            DIGEST="$IMAGE_ID"
           fi
           case "$DIGEST" in
             sha256:*) ;;
@@ -113,4 +134,13 @@ jobs:
       - name: Remove local image
         if: always()
         shell: bash
-        run: docker image rm "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" || true
+        run: |
+          set -eu
+          docker image rm "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" || true
+          # Fall back to removing by id in case the tags never stuck.
+          if [ -f "${RUNNER_TEMP}/image-id" ]; then
+            IMAGE_ID="$(tr -d ' \r\n' < "${RUNNER_TEMP}/image-id" || true)"
+            if [ -n "$IMAGE_ID" ]; then
+              docker image rm -f "$IMAGE_ID" || true
+            fi
+          fi
