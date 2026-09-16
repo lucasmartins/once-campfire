@@ -65,7 +65,11 @@ jobs:
         run: |
           set -eu
           IID_FILE="${RUNNER_TEMP}/image-id"
-          docker build \
+          rm -f "$IID_FILE"
+          # Capture the image id from `docker build -q` stdout AND --iidfile:
+          # on the host Podman socket --iidfile alone came back empty (runs
+          # 11/12), which produced the invalid ref "sha256:" at docker tag.
+          BUILD_ID="$(docker build -q \
             --iidfile "$IID_FILE" \
             --file Dockerfile \
             --tag "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
@@ -74,17 +78,31 @@ jobs:
             --build-arg GIT_REVISION="${GITHUB_SHA}" \
             --build-arg OCI_SOURCE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             --build-arg OCI_DESCRIPTION="Campfire is a web-based chat application with rooms, direct messages, file attachments, search, and bot integrations." \
-            .
-          # Capture the image id straight from the build (--iidfile) instead
-          # of trusting the build-time tags to stick on the host Podman API.
-          IMAGE_ID="$(tr -d ' \r\n' < "$IID_FILE")"
-          case "$IMAGE_ID" in
-            sha256:*) ;;
-            *) IMAGE_ID="sha256:${IMAGE_ID}" ;;
-          esac
+            .)"
+          BUILD_ID="$(printf '%s' "$BUILD_ID" | tail -n 1 | tr -d ' \r\n')"
+          IID_ID=""
+          if [ -s "$IID_FILE" ]; then
+            IID_ID="$(tr -d ' \r\n' < "$IID_FILE")"
+          fi
+          normalize_id() {
+            case "$1" in
+              sha256:[0-9a-fA-F]*) printf '%s' "$1" ;;
+              [0-9a-fA-F]*) printf 'sha256:%s' "$1" ;;
+            esac
+          }
+          IMAGE_ID="$(normalize_id "$BUILD_ID")"
+          if [ -z "$IMAGE_ID" ]; then
+            IMAGE_ID="$(normalize_id "$IID_ID")"
+          fi
+          # Refuse to tag before a usable id exists; never prefix sha256:
+          # onto an empty string.
+          printf '%s' "$IMAGE_ID" | grep -Eq '^sha256:[0-9a-fA-F]{12,64}$' || {
+            echo "::error::docker build produced no usable image id ('docker build -q' stdout and --iidfile both empty or unparsable: '${IMAGE_ID:-<empty>}'); refusing to docker tag." >&2
+            exit 1
+          }
           printf '%s\n' "$IMAGE_ID" > "$IID_FILE"
-          # Re-tag from the captured id so later steps never depend on the
-          # build-time tags.
+          # Only now re-tag from the captured id so later steps never depend
+          # on the build-time tags.
           docker tag "$IMAGE_ID" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
           docker tag "$IMAGE_ID" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
 
@@ -108,10 +126,14 @@ jobs:
         run: |
           set -eu
           IID_FILE="${RUNNER_TEMP}/image-id"
+          if [ ! -s "$IID_FILE" ]; then
+            echo "::error::$IID_FILE is missing or empty - no captured image id to print; refusing to emit a bogus digest." >&2
+            exit 1
+          fi
           IMAGE_ID="$(tr -d ' \r\n' < "$IID_FILE")"
+          # Normalize (idempotently - never double-prefix, never prefix empty).
           case "$IMAGE_ID" in
-            sha256:*) ;;
-            *) IMAGE_ID="sha256:${IMAGE_ID}" ;;
+            sha256:*) IMAGE_ID="sha256:${IMAGE_ID#sha256:}" ;;
           esac
           IMAGE="${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
           DIGEST=""
@@ -121,13 +143,12 @@ jobs:
           fi
           if [ -z "$DIGEST" ]; then
             # Build-only run (REGISTRY_TOKEN unset or push skipped): use the
-            # image id captured from docker build --iidfile, no tag lookup.
+            # image id captured from `docker build -q`, no tag lookup.
             echo "::warning::no registry digest available (build-only run or push skipped); printing local image id instead."
             DIGEST="$IMAGE_ID"
           fi
           case "$DIGEST" in
-            sha256:*) ;;
-            *) DIGEST="sha256:${DIGEST}" ;;
+            sha256:*) DIGEST="sha256:${DIGEST#sha256:}" ;;
           esac
           echo "IMAGE_DIGEST=${DIGEST}"
 
