@@ -37,11 +37,12 @@ export default class extends Controller {
   }
 
   // Only "stop" clears a name: an unknown action must never remove someone
-  // who is still typing.
+  // who is still typing. "thinking" marks the entry as bot thinking so the
+  // indicator text differs from plain human typing; "start" stays unchanged.
   #received({ action, user }) {
     if (user.id !== Current.user.id) {
       if (action === "start" || action === "thinking") {
-        this.tracker.add(user.name)
+        this.tracker.add(user.name, action === "thinking")
       } else if (action === "stop") {
         this.tracker.remove(user.name)
       }
