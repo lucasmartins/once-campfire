@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.2].define(version: 2026_09_16_120000) do
+ActiveRecord::Schema[8.2].define(version: 2026_09_17_130000) do
   create_table "accounts", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "custom_styles"
@@ -107,6 +107,27 @@ ActiveRecord::Schema[8.2].define(version: 2026_09_16_120000) do
     t.index ["user_id"], name: "index_memberships_on_user_id"
   end
 
+  create_table "message_button_clicks", force: :cascade do |t|
+    t.integer "clicker_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "message_button_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["clicker_id"], name: "index_message_button_clicks_on_clicker_id"
+    t.index ["message_button_id"], name: "index_message_button_clicks_on_message_button_id"
+  end
+
+  create_table "message_buttons", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "creator_id", null: false
+    t.string "kind", default: "action", null: false
+    t.string "label", null: false
+    t.integer "message_id", null: false
+    t.string "payload", null: false
+    t.datetime "updated_at", null: false
+    t.index ["creator_id"], name: "index_message_buttons_on_creator_id"
+    t.index ["message_id"], name: "index_message_buttons_on_message_id"
+  end
+
   create_table "messages", force: :cascade do |t|
     t.string "client_message_id", null: false
     t.datetime "created_at", null: false
@@ -185,6 +206,10 @@ ActiveRecord::Schema[8.2].define(version: 2026_09_16_120000) do
   add_foreign_key "boosts", "messages"
   add_foreign_key "bot_indicators", "rooms", on_delete: :cascade
   add_foreign_key "bot_indicators", "users", column: "bot_id", on_delete: :cascade
+  add_foreign_key "message_button_clicks", "message_buttons", on_delete: :cascade
+  add_foreign_key "message_button_clicks", "users", column: "clicker_id", on_delete: :cascade
+  add_foreign_key "message_buttons", "messages", on_delete: :cascade
+  add_foreign_key "message_buttons", "users", column: "creator_id", on_delete: :cascade
   add_foreign_key "messages", "rooms"
   add_foreign_key "messages", "users", column: "creator_id"
   add_foreign_key "push_subscriptions", "users"

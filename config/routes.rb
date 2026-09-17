@@ -93,6 +93,9 @@ Rails.application.routes.draw do
   resources :messages do
     scope module: "messages" do
       resources :boosts
+      resources :buttons, only: [] do
+        resource :click, only: :create, controller: "buttons/clicks"
+      end
     end
   end
 

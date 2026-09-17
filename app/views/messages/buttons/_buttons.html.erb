@@ -2,7 +2,9 @@
   <div class="boosts flex flex-wrap align-center gap full-width" style="--column-gap: 0.4ch; --row-gap: 0" id="<%= dom_id(message, :buttons) %>">
     <% message.message_buttons.ordered.each do |button| %>
       <div id="<%= dom_id(button) %>" class="boost boost-item flex-inline max-width align-center fill-white gap">
-        <span class="btn btn--plain txt-small"><%= button.label %></span>
+        <%= tag.button button.label, type: "button", class: "btn btn--plain txt-small",
+              data: { controller: "button-click", button_click_url_value: message_button_click_path(message, button),
+                      action: "button-click#click" } %>
       </div>
     <% end %>
   </div>

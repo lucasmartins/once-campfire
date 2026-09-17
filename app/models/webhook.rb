@@ -6,8 +6,9 @@ class Webhook < ApplicationRecord
 
   belongs_to :user
 
-  def deliver(message)
-    post(payload(message)).tap do |response|
+  def deliver(message, click = nil)
+    body = click ? button_click_payload(click) : payload(message)
+    post(body).tap do |response|
       if text = extract_text_from(response)
         receive_text_reply_to(message.room, text: text)
       elsif attachment = extract_attachment_from(response)
@@ -43,6 +44,28 @@ class Webhook < ApplicationRecord
         user:    { id: message.creator.id, name: message.creator.name },
         room:    { id: message.room.id, name: message.room.name, path: room_bot_messages_path(message), direct: message.room.direct? },
         message: { id: message.id, body: { html: message.body.body, plain: without_recipient_mentions(message.plain_text_body) }, path: message_path(message), attachments: attachments_metadata(message) }
+      }.to_json
+    end
+
+    # Button-click interaction payload. This is a distinct JSON shape from the message
+    # payload above, so bots can route it separately:
+    #
+    #   {
+    #     "kind":      "message_button_click",              # distinguishes this event from message webhooks
+    #     "button":    { "id": 1, "label": "Approve", "payload": "once" }, # payload is the opaque string the bot attached (e.g. once/session/always/deny)
+    #     "message":   { "id": 4, "path": "/rooms/1/@4" },
+    #     "room":      { "id": 1, "name": "Watercooler", "path": "/rooms/1/1-token/messages", "direct": false },
+    #     "clicked_by":{ "id": 3, "name": "Kevin" }         # the human who clicked, never the bot itself
+    #   }
+    def button_click_payload(click)
+      button = click.message_button
+      message = button.message
+      {
+        kind:       "message_button_click",
+        button:     { id: button.id, label: button.label, payload: button.payload },
+        message:    { id: message.id, path: message_path(message) },
+        room:       { id: message.room.id, name: message.room.name, path: room_bot_messages_path(message), direct: message.room.direct? },
+        clicked_by: { id: click.clicker.id, name: click.clicker.name }
       }.to_json
     end
 

@@ -48,12 +48,12 @@ module User::Bot
     webhook&.url
   end
 
-  def deliver_webhook_later(message)
-    Bot::WebhookJob.perform_later(self, message) if webhook
+  def deliver_webhook_later(message, click = nil)
+    Bot::WebhookJob.perform_later(self, message, click) if webhook
   end
 
-  def deliver_webhook(message)
-    webhook.deliver(message)
+  def deliver_webhook(message, click = nil)
+    webhook.deliver(message, click)
   end
 
 

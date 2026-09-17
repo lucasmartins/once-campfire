@@ -1,0 +1,7 @@
+approve_fourth_by_bender:
+  message: fourth
+  creator: bender
+  label: Approve
+  payload: once
+  kind: action
+  created_at: <%= 25.minutes.ago %>
