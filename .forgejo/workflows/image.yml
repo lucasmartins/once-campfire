@@ -107,11 +107,10 @@ jobs:
           # on the build-time tags.
           docker tag "$IMAGE_ID" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
           docker tag "$IMAGE_ID" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
-          # Build-only run (no REGISTRY_TOKEN): leave a localhost tag behind
-          # so Flora compose can deploy this digest with CAMPFIRE_SKIP_PULL=1.
-          if [ -z "${REGISTRY_TOKEN:-}" ]; then
-            docker tag "$IMAGE_ID" "localhost/once-campfire:${GITHUB_SHA::7}"
-          fi
+          # ALWAYS leave a localhost tag behind (registry push or not) so
+          # Flora compose can deploy this exact revision with CAMPFIRE_SKIP_PULL=1
+          # without re-pulling ~879MB from the on-host registry.
+          docker tag "$IMAGE_ID" "localhost/once-campfire:${GITHUB_SHA::7}"
 
       - name: Push image (skipped when REGISTRY_TOKEN is not set)
         shell: bash
@@ -198,10 +197,7 @@ jobs:
             exit 0
           fi
           docker image rm "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" || true
-          # Fall back to removing by id in case the tags never stuck.
-          if [ -f "${RUNNER_TEMP}/image-id" ]; then
-            IMAGE_ID="$(tr -d ' \r\n' < "${RUNNER_TEMP}/image-id" || true)"
-            if [ -n "$IMAGE_ID" ]; then
-              docker image rm -f "$IMAGE_ID" || true
-            fi
-          fi
+          # Keep localhost/once-campfire:${GITHUB_SHA::7} (and the image id)
+          # on the host Podman store for Flora skip-pull deploys: removing by
+          # IMAGE_ID would delete the localhost tag too and force a ~879MB
+          # re-pull from the on-host registry.
