@@ -8,4 +8,8 @@ class MessageButton < ApplicationRecord
   def icon_name
     payload == "deny" ? "cancel.svg" : "check.svg"
   end
+
+  def expired?
+    expires_at.present? && expires_at <= Time.current
+  end
 end

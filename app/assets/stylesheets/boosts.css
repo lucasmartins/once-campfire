@@ -49,6 +49,24 @@
   }
 }
 
+/* Message buttons (Allow/Deny): unanswered siblings and expired buttons fade,
+   the clicked answer keeps a persistent selected ring at full opacity. */
+.btn:is(.boost__action):disabled {
+  opacity: 0.45;
+}
+
+.btn:is(.boost__action).is-expired {
+  opacity: 0.45;
+}
+
+.btn:is(.boost__action).is-selected {
+  --btn-border-color: var(--color-selected-dark);
+  --btn-background: var(--color-selected);
+
+  box-shadow: 0 0 0 0.15em var(--color-selected-dark);
+  opacity: 1;
+}
+
 .btn:is(.boost__delete) {
   display: none;
 

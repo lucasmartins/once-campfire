@@ -10,6 +10,7 @@ class Messages::Buttons::ClicksController < ApplicationController
     end
 
     head :not_found and return unless @message_button
+    head :gone and return if @message_button.expired?
 
     @click = @message_button.clicks.create!(clicker: Current.user)
     @message_button.creator&.deliver_webhook_later(@message_button, @click)

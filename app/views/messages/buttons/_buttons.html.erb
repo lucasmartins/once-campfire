@@ -1,13 +1,17 @@
 <% if message.message_buttons.any? %>
-  <div class="flex-inline flex-wrap gap" id="<%= dom_id(message, :buttons) %>" style="--column-gap: 0.4ch">
+  <div class="flex-inline flex-wrap gap message__buttons" id="<%= dom_id(message, :buttons) %>" style="--column-gap: 0.4ch">
+    <% answered = message.message_buttons.any? { |button| button.clicks.exists?(clicker: Current.user) } %>
     <% message.message_buttons.ordered.each do |button| %>
+      <% clicked = answered && button.clicks.exists?(clicker: Current.user) %>
+      <% expired = button.expired? %>
       <%= tag.button type: "button",
             id: dom_id(button),
-            class: "boost__action txt-small btn",
+            class: [ "boost__action", "txt-small", "btn", ("is-selected" if clicked), ("is-expired" if expired) ],
             title: button.label,
-            aria: { label: button.label },
-            data: { controller: "button-click", button_click_url_value: message_button_click_path(message, button),
-                    action: "button-click#click" } do %>
+            aria: { label: button.label, pressed: clicked ? "true" : nil },
+            disabled: clicked || expired || answered,
+            data: ({ controller: "button-click", button_click_url_value: message_button_click_path(message, button),
+                     action: "button-click#click" } unless expired) do %>
         <%= image_tag button.icon_name, size: 20, class: "colorize--black", aria: { hidden: "true" } %>
         <span class="for-screen-reader"><%= button.label %></span>
       <% end %>

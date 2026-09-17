@@ -31,10 +31,17 @@ class Messages::Buttons::ByBotsController < ApplicationController
         {
           label: parsed["label"].to_s,
           payload: parsed["payload"].to_s,
-          kind: (parsed["kind"].presence || "action")
+          kind: (parsed["kind"].presence || "action"),
+          expires_at: parse_expires_at(parsed["expires_at"])
         }
       rescue JSON::ParserError
-        { label: "", payload: "", kind: "action" }
+        { label: "", payload: "", kind: "action", expires_at: nil }
       end
+    end
+
+    def parse_expires_at(value)
+      Time.zone.parse(value.to_s)&.utc if value.present?
+    rescue ArgumentError
+      nil
     end
 end

@@ -18,9 +18,28 @@ export default class extends Controller {
         }
       })
       if (!response.ok) throw new Error("click failed")
-      this.element.classList.add("btn--success")
+      this.select(this.element)
+      this.disableRow()
     } catch {
       this.element.removeAttribute("disabled")
+    }
+  }
+
+  // Mark the clicked button persistently selected: the ring stays after the
+  // btn--success flash animation (1s) is gone, and matches the server-rendered
+  // is-selected state for buttons the user already clicked.
+  select(button) {
+    button.classList.add("btn--success", "is-selected")
+    button.setAttribute("aria-pressed", "true")
+    button.setAttribute("disabled", "disabled")
+  }
+
+  // One answer per message: a successful click disables every sibling button.
+  disableRow() {
+    const row = this.element.closest("[id$=_buttons], .message__buttons")
+
+    for (const button of row?.querySelectorAll("button[data-controller=button-click]") ?? []) {
+      button.setAttribute("disabled", "disabled")
     }
   }
 }

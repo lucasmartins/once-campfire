@@ -5,3 +5,20 @@ approve_fourth_by_bender:
   payload: once
   kind: action
   created_at: <%= 25.minutes.ago %>
+
+deny_fourth_by_bender:
+  message: fourth
+  creator: bender
+  label: Deny
+  payload: deny
+  kind: action
+  created_at: <%= 25.minutes.ago %>
+
+expired_sixth_by_bender:
+  message: sixth
+  creator: bender
+  label: Approve
+  payload: once
+  kind: action
+  expires_at: <%= 5.minutes.ago %>
+  created_at: <%= 26.minutes.ago %>
