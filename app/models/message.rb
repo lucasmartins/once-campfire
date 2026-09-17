@@ -5,6 +5,7 @@ class Message < ApplicationRecord
   belongs_to :creator, class_name: "User", default: -> { Current.user }
 
   has_many :boosts, dependent: :destroy
+  has_many :message_buttons, dependent: :destroy
 
   has_rich_text :body
 

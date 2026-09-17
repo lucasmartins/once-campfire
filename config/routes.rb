@@ -66,6 +66,7 @@ Rails.application.routes.draw do
       scope path: ":bot_key", as: :bot, defaults: { format: :json } do
         resources :messages, controller: "messages/by_bots", only: %i[ index create update destroy ] do
           resources :boosts, controller: "messages/boosts/by_bots", only: %i[ create destroy ]
+          resources :buttons, controller: "messages/buttons/by_bots", only: %i[ create ]
         end
 
         get "messages/:id/attachment", to: "messages/attachments/by_bots#show", as: :message_attachment
