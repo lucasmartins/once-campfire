@@ -12,13 +12,30 @@ export const SLASH_COMMANDS = [
   { name: "deny", description: "Deny the pending action" }
 ]
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
+  ))
+}
+
 function autocompletableForCommand({ name, description }) {
-  return {
-    value: name,
-    name,
-    description,
-    noResultsLabel: `<strong>/${name}</strong> — ${description}`
-  }
+  return { value: name, name, description }
+}
+
+function renderCommandOption(autocompletable) {
+  const name = escapeHtml(autocompletable.name)
+  const description = escapeHtml(autocompletable.description)
+
+  return `
+    <suggestion-option class="autocomplete__item flex align-center gap unpad" role="option" value="${name}">
+      <button class="autocomplete__btn btn btn--borderless btn--transparent min-width flex-item-grow justify-start" data-value="${name}">
+        <span class="autocompletable__name">
+          <strong>/${name}</strong>
+          <span class="txt-small txt-subtle"> — ${description}</span>
+        </span>
+      </button>
+    </suggestion-option>
+  `
 }
 
 export default class extends BaseAutocompleteHandler {
@@ -38,12 +55,25 @@ export default class extends BaseAutocompleteHandler {
     callback()
   }
 
+  // Mentions render avatar buttons; commands must use the same autocomplete__btn
+  // chrome (not noResultsLabel HTML) so suggestion-option's reversed text color
+  // does not paint a white Discord-like overlay on dark Campfire.
+  fetchResultsForQuery(query, callback) {
+    this.loadAutocompletables(query, () => {
+      const html = this.autocompletablesMatchingQuery(query).map(renderCommandOption).join("")
+      callback(html)
+    })
+  }
+
+  didShowResults(selectElement) {
+    selectElement.classList.add("rich_text", "autocomplete__list--commands")
+  }
+
   insertAutocompletable(autocompletable, range) {
     if (range) { this.#editor.setSelectedRange(range) }
     this.#editor.insertString(`/${autocompletable.name} `)
   }
 
-  // Anchor the popover to the caret, like the mentions handler
   getOffsetsAtPosition(position) {
     return this.#editor.getClientRectAtPosition(position) || {}
   }

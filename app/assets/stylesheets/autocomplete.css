@@ -2,12 +2,18 @@
   background-color: var(--color-bg);
   border-radius: 0.8em;
   border: 1px solid var(--color-border);
+  color: var(--color-text);
   max-block-size: 10em;
   max-inline-size: 30ch;
   min-inline-size: 15ch;
   overflow-y: auto;
   position: absolute;
   z-index: 3;
+}
+
+.autocomplete__list--commands {
+  max-block-size: 16em;
+  max-inline-size: 42ch;
 }
 
 .autocomplete__item {
