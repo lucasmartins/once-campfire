@@ -9,13 +9,16 @@ export default class extends Controller {
     this.element.setAttribute("disabled", "disabled")
 
     try {
-      await fetch(this.urlValue, {
+      const token = document.querySelector("meta[name=csrf-token]")?.content
+      const response = await fetch(this.urlValue, {
         method: "POST",
         headers: {
-          "X-CSRF-Token": document.querySelector("meta[name=csrf-token]").content,
+          "X-CSRF-Token": token,
           "Accept": "application/json"
         }
       })
+      if (!response.ok) throw new Error("click failed")
+      this.element.classList.add("btn--success")
     } catch {
       this.element.removeAttribute("disabled")
     }
