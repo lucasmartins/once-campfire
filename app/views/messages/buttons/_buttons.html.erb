@@ -1,11 +1,16 @@
 <% if message.message_buttons.any? %>
-  <div class="boosts flex flex-wrap align-center gap full-width" style="--column-gap: 0.4ch; --row-gap: 0" id="<%= dom_id(message, :buttons) %>">
+  <div class="flex flex-wrap align-center gap" id="<%= dom_id(message, :buttons) %>" style="--column-gap: 0.4ch">
     <% message.message_buttons.ordered.each do |button| %>
-      <div id="<%= dom_id(button) %>" class="boost boost-item flex-inline max-width align-center fill-white gap">
-        <%= tag.button button.label, type: "button", class: "btn btn--plain txt-small",
-              data: { controller: "button-click", button_click_url_value: message_button_click_path(message, button),
-                      action: "button-click#click" } %>
-      </div>
+      <%= tag.button type: "button",
+            id: dom_id(button),
+            class: "btn message__action-btn",
+            title: button.label,
+            aria: { label: button.label },
+            data: { controller: "button-click", button_click_url_value: message_button_click_path(message, button),
+                    action: "button-click#click" } do %>
+        <%= image_tag button.icon_name, class: "colorize--black", size: 20, aria: { hidden: "true" } %>
+        <span class="for-screen-reader"><%= button.label %></span>
+      <% end %>
     <% end %>
   </div>
 <% end %>

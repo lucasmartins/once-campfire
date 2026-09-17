@@ -4,4 +4,8 @@ class MessageButton < ApplicationRecord
   has_many :clicks, class_name: "MessageButtonClick", dependent: :destroy
 
   scope :ordered, -> { order(:created_at) }
+
+  def icon_name
+    payload == "deny" ? "cancel.svg" : "check.svg"
+  end
 end

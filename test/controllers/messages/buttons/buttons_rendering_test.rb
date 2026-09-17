@@ -10,13 +10,14 @@ class Messages::Buttons::ButtonsRenderingTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "##{dom_id(button)}" do
-      assert_select "button[data-controller=button-click][data-button-click-url-value=?]",
-        message_button_click_path(button.message, button), text: "Approve"
+      assert_select "button.message__action-btn[data-controller=button-click][data-button-click-url-value=?]",
+        message_button_click_path(button.message, button)
+      assert_select "img[src*='check']", count: 1
+      assert_select ".for-screen-reader", text: "Approve"
     end
 
-    # The chip is a real button wired to the Stimulus click action (no passive span).
-    assert_select ".boost-item > button.btn", text: "Approve"
-    assert_select ".boost-item > button.btn[data-controller]", count: 1
+    assert_select ".boost-item", count: 0
+    assert_select "button.message__action-btn[data-controller=button-click]", count: 1
 
     # No bot_key may leak into the page the human's browser loads.
     assert_not_includes response.body, button.creator.bot_key
