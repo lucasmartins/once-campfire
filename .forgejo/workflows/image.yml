@@ -19,7 +19,10 @@ env:
 jobs:
   image:
     name: Build image on the host Podman socket
-    runs-on: ubuntu-latest
+    # Pin to the 4 rootless-Podman runners (label advertised in Flora
+    # forgejo-runner-podman config). ubuntu-latest is also served by the
+    # rootful-Docker runner 85bf35f824e6, which has a disjoint cold cache.
+    runs-on: podman-socket
     timeout-minutes: 45
     steps:
       # No external actions: Galaxy runners cannot reach data.forgejo.org
