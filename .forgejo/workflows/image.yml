@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feat/bot-indicators
 
 concurrency:
   group: image-${{ github.workflow }}-${{ github.ref }}
