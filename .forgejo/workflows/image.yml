@@ -120,11 +120,39 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -eu
-          if [ -n "${REGISTRY_TOKEN:-}" ]; then
-            docker push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
-            docker push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}"
-          else
+          DIGEST_FILE="${RUNNER_TEMP}/image-digest"
+          rm -f "$DIGEST_FILE"
+          if [ -z "${REGISTRY_TOKEN:-}" ]; then
             echo "::warning::REGISTRY_TOKEN is not set - skipping docker push."
+            exit 0
+          fi
+          # Capture push stdout+stderr and take the registry digest from the
+          # "digest: sha256:<64hex>" line the push itself prints. Do NOT do an
+          # after-the-fact inspect lookup: RepoDigests lives on the shared
+          # host daemon, and a sibling branch job racing on the same host
+          # Podman can drop the tag between push and lookup ("No such image"
+          # - run at 7a199bb).
+          PUSH_LOG="${RUNNER_TEMP}/push.log"
+          if ! docker push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" >"$PUSH_LOG" 2>&1; then
+            cat "$PUSH_LOG" >&2 || true
+            echo "::error::docker push ${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA} failed." >&2
+            exit 1
+          fi
+          if ! docker push "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7}" >>"$PUSH_LOG" 2>&1; then
+            cat "$PUSH_LOG" >&2 || true
+            echo "::error::docker push ${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA::7} failed." >&2
+            exit 1
+          fi
+          cat "$PUSH_LOG"
+          # First "digest: sha256:[0-9a-f]{64}" line from the push output.
+          RAW_DIGEST="$(grep -Eo 'digest:[[:space:]]*sha256:[0-9a-f]{64}' "$PUSH_LOG" | head -n1 || true)"
+          RAW_DIGEST="${RAW_DIGEST##*digest:}"
+          RAW_DIGEST="$(printf '%s' "$RAW_DIGEST" | tr -d '[:space:]')"
+          if [ -n "$RAW_DIGEST" ]; then
+            printf '%s\n' "$RAW_DIGEST" > "$DIGEST_FILE"
+            echo "Captured registry digest from push output: $RAW_DIGEST"
+          else
+            echo "::warning::docker push succeeded but its output had no 'digest: sha256:...' line; the Print image digest step will fail rather than guess."
           fi
 
       - name: Print image digest
@@ -133,28 +161,27 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -eu
+          DIGEST_FILE="${RUNNER_TEMP}/image-digest"
           IID_FILE="${RUNNER_TEMP}/image-id"
-          if [ ! -s "$IID_FILE" ]; then
-            echo "::error::$IID_FILE is missing or empty - no captured image id to print; refusing to emit a bogus digest." >&2
-            exit 1
-          fi
-          IMAGE_ID="$(tr -d ' \r\n' < "$IID_FILE")"
-          # Normalize (idempotently - never double-prefix, never prefix empty).
-          case "$IMAGE_ID" in
-            sha256:*) IMAGE_ID="sha256:${IMAGE_ID#sha256:}" ;;
-          esac
-          IMAGE="${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}"
           DIGEST=""
-          if [ -n "${REGISTRY_TOKEN:-}" ]; then
-            # RepoDigests is populated by the push above.
-            DIGEST="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" | grep -o 'sha256:[0-9a-f]*' | head -n1 || true)"
+          if [ -s "$DIGEST_FILE" ]; then
+            # Preferred: the registry digest captured from the docker push
+            # output itself (the "digest: sha256:<64hex>" line).
+            DIGEST="$(tr -d ' \r\n' < "$DIGEST_FILE")"
           fi
           if [ -z "$DIGEST" ]; then
-            # Build-only run (REGISTRY_TOKEN unset or push skipped): use the
-            # image id captured from `docker build -q`, no tag lookup.
-            echo "::warning::no registry digest available (build-only run or push skipped); printing local image id instead."
-            DIGEST="$IMAGE_ID"
+            if [ -n "${REGISTRY_TOKEN:-}" ]; then
+              echo "::error::REGISTRY_TOKEN is set but no registry digest was captured from docker push (${DIGEST_FILE} missing or empty); refusing to fall back to a build-only id or to an after-the-fact inspect lookup." >&2
+              exit 1
+            fi
+            if [ ! -s "$IID_FILE" ]; then
+              echo "::error::$IID_FILE is missing or empty - no captured image id to print; refusing to emit a bogus digest." >&2
+              exit 1
+            fi
+            echo "::warning::REGISTRY_TOKEN is not set - push skipped (build-only run); printing local image id instead."
+            DIGEST="$(tr -d ' \r\n' < "$IID_FILE")"
           fi
+          # Normalize (idempotently - never double-prefix, never prefix empty).
           case "$DIGEST" in
             sha256:*) DIGEST="sha256:${DIGEST#sha256:}" ;;
           esac
