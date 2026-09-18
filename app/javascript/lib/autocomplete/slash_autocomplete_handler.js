@@ -1,16 +1,31 @@
 import BaseAutocompleteHandler from "lib/autocomplete/base_autocomplete_handler"
+import { rankSlashCommands } from "lib/autocomplete/slash_command_search"
 
-// Static command stubs. The Hermes plugin replaces this list with its own
+// Command list. The Hermes plugin replaces this in place with its live
 // registry later; the handler only filters and inserts whatever is set here.
+// "kanban" is stubbed so /kan and /profile have something to hit before the
+// plugin registry exists.
 export const SLASH_COMMANDS = [
-  { name: "help", description: "Show available slash commands" },
-  { name: "status", description: "Show session status" },
-  { name: "new", description: "Start a new session" },
-  { name: "compact", description: "Compact the session context" },
-  { name: "model", description: "Show or switch the active model" },
-  { name: "approve", description: "Approve the pending action" },
-  { name: "deny", description: "Deny the pending action" }
+  { name: "help", description: "Show available slash commands", aliases: [] },
+  { name: "status", description: "Show session status", aliases: [] },
+  { name: "new", description: "Start a new session", aliases: [] },
+  { name: "compact", description: "Compact the session context", aliases: [] },
+  { name: "model", description: "Show or switch the active model", aliases: [] },
+  { name: "approve", description: "Approve the pending action", aliases: [] },
+  { name: "deny", description: "Deny the pending action", aliases: [] },
+  { name: "kanban", description: "Board and profile workflow for the current project", aliases: [] }
 ]
+
+// Hidden test hook: lets Camofox inject a synthetic registry so palette
+// snapshots are not blocked on gateway command discovery.
+if (typeof window !== "undefined") {
+  window.campfireTest = window.campfireTest || {}
+  if (!window.campfireTest.setSlashCommands) {
+    window.campfireTest.setSlashCommands = (commands) => {
+      SLASH_COMMANDS.splice(0, SLASH_COMMANDS.length, ...commands)
+    }
+  }
+}
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => (
@@ -58,9 +73,16 @@ export default class extends BaseAutocompleteHandler {
   // Mentions render avatar buttons; commands must use the same autocomplete__btn
   // chrome (not noResultsLabel HTML) so suggestion-option's reversed text color
   // does not paint a white Discord-like overlay on dark Campfire.
+  // Rank the live SLASH_COMMANDS on every keystroke (the test hook and the
+  // plugin registry mutate it in place) instead of the mention collection
+  // matcher, which only does name/description regex and cannot rank a name
+  // prefix above a description hit.
   fetchResultsForQuery(query, callback) {
     this.loadAutocompletables(query, () => {
-      const html = this.autocompletablesMatchingQuery(query).map(renderCommandOption).join("")
+      const html = rankSlashCommands(SLASH_COMMANDS, query)
+        .map(autocompletableForCommand)
+        .map(renderCommandOption)
+        .join("")
       callback(html)
     })
   }
