@@ -14,7 +14,7 @@
 
             <div class="flex composer__input input input--actor fill-white min-width" style="--input-border-radius: 1.3rem">
               <div class="flex align-end gap full-width">
-                <%= image_tag "messages-outlined.svg", size: 22, aria: { hidden: "true" }, class: "composer__input-hint colorize--black", style: "view-transition-name: input-btn;" %>
+                <%= image_tag "messages-outlined.svg", size: 22, aria: { hidden: "true" }, class: "composer__input-hint colorize--black", style: "view-transition-name: input-btn;", data: { composer_target: "inputHint", default_src: image_path("messages-outlined.svg"), recording_src: image_path("mic.svg") } %>
 
                 <div class="flex flex-column flex-item-grow min-width gap">
                   <%= form.rich_text_area :body,
@@ -35,6 +35,11 @@
                   <input type="file" data-action="composer#filePicked" multiple />
                   <span class="for-screen-reader">Attach a file</span>
                 </label>
+
+                <button type="button" class="btn btn--borderless txt-small flex-item-no-shrink composer__mic-btn" data-composer-target="mic" data-action="composer#toggleRecording">
+                  <%= image_tag "mic.svg", size: 22, class: "colorize--black", aria: { hidden: "true" } %>
+                  <span class="for-screen-reader">Record audio</span>
+                </button>
 
                 <button class="btn btn--borderless txt-small flex-item-no-shrink composer__rich-text-btn" type="button" data-action="composer#toggleToolbar">
                   <%= image_tag "text-options.svg", size: 20, class: "colorize--black", aria: { hidden: "true" } %>

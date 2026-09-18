@@ -5,7 +5,9 @@ class Messages::AttachmentPresentation
 
   def render
     if message.attachment.attached?
-      if message.attachment.previewable? || message.attachment.variable?
+      if message.attachment.content_type.to_s.start_with?("audio/")
+        render_audio_chip
+      elsif message.attachment.previewable? || message.attachment.variable?
         render_preview
       else
         render_link
@@ -16,6 +18,10 @@ class Messages::AttachmentPresentation
   private
     attr_reader :message, :context
     delegate :tag, :link_to, :broadcast_image_tag, :rails_blob_path, :url_for, to: :context
+
+    def render_audio_chip
+      context.render partial: "messages/audio_chip", locals: { message: message, filename: filename }
+    end
 
     def render_preview
       if message.attachment.video?

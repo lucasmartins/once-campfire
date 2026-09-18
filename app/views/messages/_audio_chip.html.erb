@@ -1,0 +1,12 @@
+<%# Shared audio chip (PM12-S1). Markup contract mirrors app/javascript/lib/audio_chip.js:
+    .audio-chip > .audio-chip__play + .audio-chip__filename (+ .audio-chip__duration)
+    + .audio-chip__transcript. The transcript slot ships EMPTY in S1 — the PM12
+    plugin slice fills it after gateway STT. Do not render STT text here. %>
+<div class="audio-chip flex flex--align-center gap-half" data-controller="audio-chip" data-audio-chip-src-value="<%= rails_blob_path(message.attachment) %>">
+  <button type="button" class="btn btn--plain audio-chip__play flex-item-no-shrink" data-action="audio-chip#toggle" aria-label="Play audio <%= filename %>">
+    <%= image_tag "play.svg", size: 18, class: "colorize--black", aria: { hidden: "true" } %>
+  </button>
+  <span class="audio-chip__filename txt-small overflow-ellipsis"><%= filename %></span>
+  <span class="audio-chip__duration txt-small flex-item-no-shrink" data-audio-chip-target="duration"></span>
+  <span class="audio-chip__transcript"></span>
+</div>
