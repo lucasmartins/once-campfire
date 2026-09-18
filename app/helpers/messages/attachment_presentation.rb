@@ -20,7 +20,11 @@ class Messages::AttachmentPresentation
     delegate :tag, :link_to, :broadcast_image_tag, :rails_blob_path, :url_for, to: :context
 
     def render_audio_chip
-      context.render partial: "messages/audio_chip", locals: { message: message, filename: filename }
+      context.render partial: "messages/audio_chip", locals: {
+        message: message,
+        filename: filename,
+        transcript: Rails.cache.read([ "audio-transcript", message.id ]).to_s
+      }
     end
 
     def render_preview

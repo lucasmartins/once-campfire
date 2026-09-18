@@ -15,7 +15,7 @@ class Messages::AttachmentPresentationTest < ActionView::TestCase
     assert_no_match /Download /, presentation
   end
 
-  test "audio chip transcript slot ships empty in S1" do
+  test "audio chip transcript slot ships empty without a cached STT result" do
     message = Message.create! room: rooms(:pets), body: "<div></div>", client_message_id: "audio-002", creator: users(:jason)
     message.attachment.attach io: File.open(Rails.root.join("test/fixtures/files/pm12-tiny.wav")), filename: "voice-message.wav", content_type: "audio/wav"
 
@@ -43,5 +43,20 @@ class Messages::AttachmentPresentationTest < ActionView::TestCase
 
     assert_match /audio-chip__filename/, presentation
     assert_no_match /message__action-btn/, presentation
+  end
+
+  test "cached STT result fills the transcript slot" do
+    old = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    message = Message.create! room: rooms(:pets), body: "<div></div>", client_message_id: "audio-005", creator: users(:jason)
+    message.attachment.attach io: File.open(Rails.root.join("test/fixtures/files/pm12-tiny.wav")), filename: "voice-message.wav", content_type: "audio/wav"
+    Rails.cache.write([ "audio-transcript", message.id ], "Here's an audio message for testing.")
+
+    presentation = view.message_presentation(message)
+
+    assert_match /audio-chip__transcript">Here/, presentation
+    assert_match /audio message for testing/, presentation
+  ensure
+    Rails.cache = old
   end
 end
