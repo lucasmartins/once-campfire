@@ -172,9 +172,25 @@ export default class extends Controller {
 
   #applyAutoVoice(on) {
     writeAutoVoice(this.roomIdValue, on)
+    this.#syncAutoVoice(on)
     if (!this.hasAutoVoiceTarget) return
     this.autoVoiceTarget.classList.toggle("is-selected", on)
     this.autoVoiceTarget.setAttribute("aria-pressed", on ? "true" : "false")
+  }
+
+  #syncAutoVoice(on) {
+    if (!this.roomIdValue) return
+    const token = document.querySelector("meta[name=csrf-token]")?.content
+    fetch(`/rooms/${this.roomIdValue}/auto_voice`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token,
+        "Accept": "application/json"
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({ enabled: !!on })
+    }).catch(() => {})
   }
 
   async #startRecording() {
