@@ -74,6 +74,7 @@ Rails.application.routes.draw do
         post "indicators/:kind", to: "bot/indicators#create", as: :bot_indicators
 
         get "presence", to: "bot/presence#show", as: :bot_presence
+        post "slash_commands", to: "bot/slash_commands#create", as: :bot_slash_commands
       end
     end
 
@@ -84,6 +85,7 @@ Rails.application.routes.draw do
     end
 
     get "@:message_id", to: "rooms#show", as: :at_message
+    get "slash_commands", to: "rooms/slash_commands#index"
   end
 
   namespace :rooms do

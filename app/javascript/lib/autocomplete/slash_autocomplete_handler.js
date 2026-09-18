@@ -54,6 +54,8 @@ function renderCommandOption(autocompletable) {
 }
 
 export default class extends BaseAutocompleteHandler {
+  #serverFetch = null
+
   constructor(element) {
     super(element)
     this.setAutocompletables(SLASH_COMMANDS.map(autocompletableForCommand))
@@ -67,7 +69,22 @@ export default class extends BaseAutocompleteHandler {
   // resolve with nothing when no URL is set, wiping the local command list,
   // so serve the list installed in the constructor instead.
   loadAutocompletables(query, callback) {
-    callback()
+    this.#refreshFromServer().finally(() => callback())
+  }
+
+  #refreshFromServer() {
+    if (this.#serverFetch) return this.#serverFetch
+    const roomId = typeof Current !== "undefined" && Current.room && Current.room.id
+    if (!roomId || typeof fetch !== "function") return Promise.resolve()
+
+    this.#serverFetch = fetch(`/rooms/${roomId}/slash_commands`, { headers: { Accept: "application/json" }, credentials: "same-origin" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        const commands = data && Array.isArray(data.commands) ? data.commands : []
+        if (commands.length) SLASH_COMMANDS.splice(0, SLASH_COMMANDS.length, ...commands)
+      })
+      .catch(() => {})
+    return this.#serverFetch
   }
 
   // Mentions render avatar buttons; commands must use the same autocomplete__btn
