@@ -3,10 +3,11 @@ import FileUploader from "models/file_uploader"
 import { onNextEventLoopTick, nextFrame } from "helpers/timing_helpers"
 import { escapeHTML } from "helpers/string_helpers"
 import { audioChipTemplate, isAudio } from "lib/audio_chip"
+import { readAutoVoice, writeAutoVoice } from "lib/auto_voice"
 
 export default class extends Controller {
   static classes = [ "toolbar" ]
-  static targets = [ "clientid", "fields", "fileList", "inputHint", "mic", "text" ]
+  static targets = [ "clientid", "fields", "fileList", "inputHint", "mic", "autoVoice", "text" ]
   static values = { roomId: Number }
   static outlets = [ "messages" ]
 
@@ -16,6 +17,7 @@ export default class extends Controller {
 
   connect() {
     this.#registerTestHook()
+    this.#applyAutoVoice(readAutoVoice(this.roomIdValue))
 
     if (!this.#usingTouchDevice) {
       onNextEventLoopTick(() => this.textTarget.focus())
@@ -38,6 +40,21 @@ export default class extends Controller {
         composer?.attachFile(fileOrBlob)
       }
     }
+
+    window.campfireTest.setAutoVoice = on => {
+      const composer = this.#composerController()
+      composer?.setAutoVoice(!!on)
+    }
+
+    window.campfireTest.autoVoice = () => {
+      const composer = this.#composerController()
+      return composer?.autoVoiceOn() ?? false
+    }
+  }
+
+  #composerController() {
+    const element = document.querySelector('[data-controller~="composer"]')
+    return element && this.application.getControllerForElementAndIdentifier(element, "composer")
   }
 
   submit(event) {
@@ -138,6 +155,26 @@ export default class extends Controller {
   // #files like any paperclip/drop/paste audio (PM12-S1).
   async toggleRecording() {
     this.#recorder ? this.#stopRecording() : await this.#startRecording()
+  }
+
+  // PM14-S1: human control only. Plugin will read this preference in a later slice.
+  toggleAutoVoice() {
+    this.setAutoVoice(!this.autoVoiceOn())
+  }
+
+  setAutoVoice(on) {
+    this.#applyAutoVoice(!!on)
+  }
+
+  autoVoiceOn() {
+    return this.hasAutoVoiceTarget && this.autoVoiceTarget.getAttribute("aria-pressed") === "true"
+  }
+
+  #applyAutoVoice(on) {
+    writeAutoVoice(this.roomIdValue, on)
+    if (!this.hasAutoVoiceTarget) return
+    this.autoVoiceTarget.classList.toggle("is-selected", on)
+    this.autoVoiceTarget.setAttribute("aria-pressed", on ? "true" : "false")
   }
 
   async #startRecording() {

@@ -72,3 +72,10 @@
   animation: pulsing-outline 2s infinite both;
   outline: 0 solid var(--color-alert);
 }
+
+.composer__auto-voice-btn.is-selected {
+  --btn-border-color: var(--color-selected-dark);
+  --btn-background: var(--color-selected);
+
+  box-shadow: 0 0 0 0.15em var(--color-selected-dark);
+}

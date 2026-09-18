@@ -41,6 +41,11 @@
                   <span class="for-screen-reader">Record audio</span>
                 </button>
 
+                <button type="button" class="btn btn--borderless txt-small flex-item-no-shrink composer__auto-voice-btn" data-composer-target="autoVoice" data-action="composer#toggleAutoVoice" aria-pressed="false" title="Automatic voice replies">
+                  <%= image_tag "speaker.svg", size: 20, class: "colorize--black", aria: { hidden: "true" } %>
+                  <span class="for-screen-reader">Automatic voice replies</span>
+                </button>
+
                 <button class="btn btn--borderless txt-small flex-item-no-shrink composer__rich-text-btn" type="button" data-action="composer#toggleToolbar">
                   <%= image_tag "text-options.svg", size: 20, class: "colorize--black", aria: { hidden: "true" } %>
                   <span class="for-screen-reader">Rich text</span>
