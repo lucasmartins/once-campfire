@@ -84,6 +84,12 @@ const rand = ([ min, max ]) => min + Math.random() * (max - min)
 // Sample a range along `t` (0→min, 1→max) — couples travel/lifetime to `life`.
 const lerp = ([ min, max ], t) => min + (max - min) * t
 
+// Timer backstop past a particle's full lifetime for the retirement that
+// normally rides the first animationiteration event. Generous so it never
+// fires before the reduce-motion flash (650ms + delay) finishes on particles
+// whose rise duration (320–700ms, life-biased) ran shorter than the flash.
+const RETIRE_SLACK_MS = 450
+
 // One particle's motion plan (Desktop spawn()). Pure: no DOM, node-testable.
 export function spawnParticle(config = BURST_CONFIG, colors = [ HEART_COLOR ]) {
   // Short-lived particles fade out lower; a few live longer and rise higher.
@@ -131,6 +137,17 @@ function createParticleElement(particle) {
 
   particleElement.innerHTML = `<span class="heart-burst__sway"><span class="heart-burst__glyph">${buildHeartSVG()}</span></span>`
 
+  // Pop runs infinite (see heart-burst.css); stop it at its first iteration
+  // boundary — the same moment the old finite `both` play ended on. The
+  // glyph's resting state (no transform) equals the pop's final scale(1).
+  const glyph = particleElement.querySelector(".heart-burst__glyph")
+
+  glyph.addEventListener("animationiteration", event => {
+    if (event.animationName !== "heart-burst-pop") return
+
+    glyph.style.animation = "none"
+  })
+
   return particleElement
 }
 
@@ -168,18 +185,36 @@ export function burstHearts(anchorEl) {
   }
 
   const add = () => {
-    const particle = createParticleElement(spawnParticle())
+    const plan = spawnParticle()
+    const particle = createParticleElement(plan)
 
-    // Retire on the RISE/FLASH track only (sway is infinite, pop is shorter).
-    particle.addEventListener("animationend", event => {
-      if (event.animationName !== "heart-burst-rise" && event.animationName !== "heart-burst-flash") return
+    // Retire on the RISE/FLASH track only (sway is infinite by design, pop
+    // self-neutralizes at its own boundary). Rise/flash also run infinite —
+    // Camoufox freezes finite animations at their first keyframe — so the
+    // particle is retired HERE at the first iteration boundary (delay +
+    // duration, the exact moment the old finite animationend fired) with a
+    // timer backstop in case the iteration event is missed or coalesced.
+    const retire = () => {
+      if (!particle.isConnected) return
 
       particle.remove()
 
       if (burst.field.childElementCount === 0 && !burst.timers.size) {
-        removeField(anchorEl, burst)
+        removeField(anchor, burst)
       }
-    })
+    }
+
+    const retireTimer = setTimeout(retire, plan.durationMs + plan.delayMs + RETIRE_SLACK_MS)
+
+    const onBoundary = event => {
+      if (event.animationName !== "heart-burst-rise" && event.animationName !== "heart-burst-flash") return
+
+      clearTimeout(retireTimer)
+      retire()
+    }
+
+    particle.addEventListener("animationiteration", onBoundary)
+    particle.addEventListener("animationend", onBoundary) // engines where the track still ends
 
     // Cap simultaneously-alive particles (oldest retire first, like Desktop).
     while (burst.field.childElementCount >= BURST_CONFIG.maxAlive) {
