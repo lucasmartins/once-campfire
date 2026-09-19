@@ -4,6 +4,7 @@ import { onNextEventLoopTick, nextFrame } from "helpers/timing_helpers"
 import { escapeHTML } from "helpers/string_helpers"
 import { audioChipTemplate, isAudio } from "lib/audio_chip"
 import { readAutoVoice, writeAutoVoice, unlockAutoplay } from "lib/auto_voice"
+import { burstHearts, detectGratitude, markBurstMessage } from "lib/heart_burst"
 
 export default class extends Controller {
   static classes = [ "toolbar" ]
@@ -52,6 +53,9 @@ export default class extends Controller {
       const composer = this.#composerController()
       return composer?.autoVoiceOn() ?? false
     }
+
+    // PM17: fire a heart burst on the open room's composer (debugger only).
+    window.campfireTest.burstHearts = () => burstHearts(document.querySelector(".composer__input"))
   }
 
   #composerController() {
@@ -265,6 +269,14 @@ export default class extends Controller {
     if (this.#validInput()) {
       const clientMessageId = this.#generateClientId()
 
+      // PM17: optimistic burst from the composer on local send, like
+      // Desktop's composer placement. The client_message_id is marked FIRST
+      // so the pending insert and the log reconciliation never double-fire.
+      if (detectGratitude(this.textTarget.textContent)) {
+        markBurstMessage(clientMessageId)
+        burstHearts(this.#heartAnchor())
+      }
+
       await this.messagesOutlet.insertPendingMessage(clientMessageId, this.textTarget)
       await nextFrame()
 
@@ -383,6 +395,12 @@ export default class extends Controller {
   #audioChipHost() {
     const input = this.element.querySelector(".composer__input")
     return input && input.querySelector(".composer__audio")
+  }
+
+  // PM17: hearts rise from the composer input row (same anchor as
+  // window.campfireTest.burstHearts).
+  #heartAnchor() {
+    return this.element.querySelector(".composer__input")
   }
 
   #pendingUploadProgress(filename, percent=0) {

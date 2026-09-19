@@ -4,6 +4,7 @@ import ClientMessage from "models/client_message"
 import MessageFormatter, { ThreadStyle } from "models/message_formatter"
 import MessagePaginator from "models/message_paginator"
 import ScrollManager from "models/scroll_manager"
+import { burstHearts, detectGratitude, hasBurstMessage, markBurstMessage } from "lib/heart_burst"
 
 export default class extends Controller {
   static targets = [ "latest", "message", "body", "messages", "template" ]
@@ -14,6 +15,8 @@ export default class extends Controller {
   #paginator
   #formatter
   #scrollManager
+  // PM17: false until connect() so the initial history batch never bursts.
+  #heartsArmed = false
 
   // Lifecycle
 
@@ -39,6 +42,11 @@ export default class extends Controller {
     }
 
     this.#paginator.monitor()
+
+    // PM17: Stimulus fires messageTargetConnected for every pre-existing
+    // .message BEFORE connect() — those were only recorded above, not
+    // celebrated. From here on, newly connected messages may burst.
+    this.#heartsArmed = true
   }
 
   disconnect() {
@@ -47,6 +55,11 @@ export default class extends Controller {
 
   messageTargetConnected(target) {
     this.#formatter.format(target, ThreadStyle.thread)
+
+    // PM17: burst from any newly inserted gratitude message (other users'
+    // messages and this user's log reconciliation) — one burst per message,
+    // ever, keyed on the message DOM id (message_<client_message_id>).
+    this.#burstHeartsFor(target)
   }
 
   bodyTargetConnected(target) {
@@ -168,6 +181,23 @@ export default class extends Controller {
 
     if (soundTarget) {
       this.dispatch("play", { target: soundTarget })
+    }
+  }
+
+  // PM17: thank-you hearts. Guarded so the initial history load, pagination
+  // backfills, and refresh-room re-renders never replay old gratitude.
+  #burstHeartsFor(target) {
+    if (!this.#heartsArmed) return
+
+    // The id suffix is the client_message_id shared by the optimistic
+    // template and the server-rendered message (to_key).
+    const clientMessageId = target.id.replace(/^message_/, "")
+
+    if (hasBurstMessage(clientMessageId)) return
+
+    if (detectGratitude(target.textContent)) {
+      markBurstMessage(clientMessageId)
+      burstHearts(target)
     }
   }
 
