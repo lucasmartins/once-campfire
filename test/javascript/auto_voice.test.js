@@ -40,3 +40,61 @@ test("rooms do not share the flag", () => {
   writeAutoVoice(1, true, storage)
   assert.equal(readAutoVoice(2, storage), false)
 })
+
+
+// PM16-F autoplay gate: a bot voice message autoplays only when the room's
+// auto-voice is "on" in storage AND the user produced a gesture this page
+// session. Restored storage alone (page load) must NOT autoplay — the
+// autoplayUnlocked flag lives in module state, so these tests mint fresh
+// module instances via a unique import query string to control it.
+
+let freshTag = 0
+const freshModule = () =>
+  import(`../../app/javascript/lib/auto_voice.js?fresh=${++freshTag}`)
+
+test("autoplay gate is not ready by default, even with storage on", async () => {
+  const { autoplayReady } = await freshModule()
+  const storage = memoryStorage({ "campfire.autoVoice.7": "on" })
+
+  assert.equal(autoplayReady(7, storage), false)
+})
+
+test("autoplay gate is ready only after unlock + storage on", async () => {
+  const { autoplayReady, unlockAutoplay } = await freshModule()
+  const storage = memoryStorage({ "campfire.autoVoice.7": "on" })
+
+  unlockAutoplay()
+
+  assert.equal(autoplayReady(7, storage), true)
+})
+
+test("unlock alone is not enough without storage on", async () => {
+  const { autoplayReady, unlockAutoplay } = await freshModule()
+  const storage = memoryStorage({ "campfire.autoVoice.7": "off" })
+
+  unlockAutoplay()
+
+  assert.equal(autoplayReady(7, storage), false)
+})
+
+test("autoplay gate is room scoped", async () => {
+  const { autoplayReady, unlockAutoplay } = await freshModule()
+  const storage = memoryStorage()
+  writeAutoVoice(1, true, storage)
+
+  unlockAutoplay()
+
+  assert.equal(autoplayReady(1, storage), true)
+  assert.equal(autoplayReady(2, storage), false)
+})
+
+test("a second room is not unlocked by the first room's gesture + toggle", async () => {
+  const { autoplayReady, unlockAutoplay } = await freshModule()
+  // Room 1 was toggled on in a previous session; its storage survives.
+  const storage = memoryStorage({ "campfire.autoVoice.1": "on" })
+
+  unlockAutoplay() // room 1's toggle click, this session
+
+  assert.equal(autoplayReady(1, storage), true)
+  assert.equal(autoplayReady(2, storage), false)
+})

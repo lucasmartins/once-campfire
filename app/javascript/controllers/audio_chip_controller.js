@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { autoplayReady } from "lib/auto_voice"
 
 // Shared audio chip controller (PM12-S1 → PM16-B/C). Drives BOTH chips:
 // the message-log chip (src from data-audio-chip-src-value, same-origin blob
@@ -31,6 +32,7 @@ export default class extends Controller {
       if (this.hasDurationTarget && isFinite(this.audio.duration)) {
         this.durationTarget.textContent = formatDuration(this.audio.duration)
       }
+      this.#maybeAutoplay()
     })
 
     this.audio.addEventListener("ended", () => this.#setPaused(true))
@@ -57,6 +59,26 @@ export default class extends Controller {
 
   toggle() {
     this.audio.paused ? this.audio.play() : this.audio.pause()
+  }
+
+  // PM16-F: a bot voice message arriving in the open room plays by itself —
+  // but only when the user toggled auto-voice ON in this page session (the
+  // click is the gesture) and the message is not their own. Any rejection
+  // (autoplay still blocked, src gone) is swallowed: the chip simply shows
+  // its play button.
+  #maybeAutoplay() {
+    try {
+      if (typeof Current == "undefined") return
+
+      const messageUserId = this.element.closest(".message")?.dataset.userId
+      const room = Current.room
+
+      if (messageUserId && messageUserId != Current.user?.id && autoplayReady(room?.id)) {
+        this.audio.play().catch(() => {})
+      }
+    } catch {
+      // Missing Current/meta tags or a torn-down element: never autoplay.
+    }
   }
 
   // Click on the waveform canvas seeks by the x fraction of its width.

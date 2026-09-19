@@ -3,7 +3,7 @@ import FileUploader from "models/file_uploader"
 import { onNextEventLoopTick, nextFrame } from "helpers/timing_helpers"
 import { escapeHTML } from "helpers/string_helpers"
 import { audioChipTemplate, isAudio } from "lib/audio_chip"
-import { readAutoVoice, writeAutoVoice } from "lib/auto_voice"
+import { readAutoVoice, writeAutoVoice, unlockAutoplay } from "lib/auto_voice"
 
 export default class extends Controller {
   static classes = [ "toolbar" ]
@@ -165,6 +165,10 @@ export default class extends Controller {
   }
 
   setAutoVoice(on) {
+    // PM16-F: enabling auto-voice is a click (the autoplay gesture); record
+    // it so bot audio chips may autoplay this session. connect()'s restore
+    // path goes through #applyAutoVoice directly and must NOT unlock.
+    if (on) unlockAutoplay()
     this.#applyAutoVoice(!!on)
   }
 
