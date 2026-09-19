@@ -158,13 +158,24 @@
 .btn--negative {
   --btn-border-color: transparent;
   --hover-size: 0;
-  --hover-filter: brightness(0.7);
 
   img:not(.avatar) {
     filter: invert(100%);
 
     @media (prefers-color-scheme: dark) {
       filter: invert(0%);
+    }
+  }
+
+  /* PM18: brightness(0.7) darkened the already-black dark-mode button to
+     invisibility. Lighten on hover in dark mode so the state reads. */
+  @media (any-hover: hover) {
+    &:where(:not(:active):hover) {
+      --hover-filter: brightness(0.85);
+
+      @media (prefers-color-scheme: dark) {
+        --hover-filter: brightness(1.3);
+      }
     }
   }
 }

@@ -13,17 +13,9 @@
   }
 }
 
-/* Attachments */
-.composer__attachment-btn {
-  --hover-filter: brightness(0.85);
-
-  @media (any-hover: hover) {
-    &:where(:not(:active):hover) {
-      filter: var(--hover-filter);
-      box-shadow: none;
-    }
-  }
-}
+/* Attachments — no bespoke hover: the stock ring (base.css box-shadow
+   --hover-color) renders in both themes; brightness() darkening is
+   invisible on the near-black dark button (PM18). */
 
 /* Pending attachments */
 .composer__filelist {
@@ -76,18 +68,9 @@
   }
 }
 
-/* Rich text */
+/* Rich text — stock ring hover in both themes (PM18). */
 .composer__rich-text-btn {
-  --hover-filter: brightness(0.85);
-
   display: none;
-
-  @media (any-hover: hover) {
-    &:where(:not(:active):hover) {
-      filter: var(--hover-filter);
-      box-shadow: none;
-    }
-  }
 
   img {
     inline-size: 1.7em;

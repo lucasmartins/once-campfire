@@ -79,20 +79,9 @@
   background-image: url("pause.svg");
 }
 
-/* Mic button in the composer cluster (PM12-S1). PM16-D: the same rule now
-   covers the auto-voice button so its hover matches the sibling composer
-   icon buttons — no bespoke --hover-filter anywhere. */
-.composer__mic-btn,
-.composer__auto-voice-btn {
-  --hover-filter: brightness(0.85);
-
-  @media (any-hover: hover) {
-    &:where(:not(:active):hover) {
-      filter: var(--hover-filter);
-      box-shadow: none;
-    }
-  }
-}
+/* Mic + auto-voice buttons in the composer cluster (PM12-S1, PM16-D).
+   PM18: no bespoke hover — the stock ring (base.css) renders in both
+   themes; brightness() darkening is invisible in dark mode. */
 
 .composer__mic-btn--recording {
   animation: pulsing-outline 2s infinite both;
