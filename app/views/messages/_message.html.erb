@@ -1,8 +1,8 @@
 <%# Be sure to check/update messages/_template.html.erb when changing this file %>
 
 <%# Bump this version when the message presentation filters change what they emit. Editing this line changes the template digest, which busts BOTH this fragment cache and the collection cache that keys on this partial's digest (helper Ruby changes alone don't). %>
-<%# presentation-v9: audio chip transcript slot filled from cache after STT (PM12). %>
-<% cache [ message, "presentation-v9", Rails.cache.read(["audio-transcript", message.id]) ] do %>
+<%# presentation-v10: audio chip drops the filename and gains a client-side waveform canvas (PM16-C). %>
+<% cache [ message, "presentation-v10", Rails.cache.read(["audio-transcript", message.id]) ] do %>
   <%= message_tag message do %>
     <h2 class="message__day-separator"><%= local_datetime_tag message.created_at, style: :date %></h2>
 

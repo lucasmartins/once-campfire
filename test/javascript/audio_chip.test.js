@@ -22,32 +22,52 @@ test("isAudio does not confuse image/audiobook style prefixes", () => {
   assert.equal(isAudio({ type: "audio" }), false)
 })
 
-test("audioChipTemplate renders the shared chip markup contract", () => {
-  const chip = audioChipTemplate({ filename: "voice-message.webm", index: 0 })
+test("audioChipTemplate renders play + waveform canvas + duration, no filename (PM16-B)", () => {
+  const chip = audioChipTemplate({ index: 0, src: "blob:http://localhost/1" })
 
-  assert.match(chip, /class="btn btn--plain audio-chip /)
+  // The chip is a container div hosting its own audio-chip controller, not a
+  // whole-chip delete button.
+  assert.match(chip, /^<div class="audio-chip /)
+  assert.match(chip, /data-controller="audio-chip"/)
+  assert.match(chip, /data-audio-chip-src-value="blob:http:\/\/localhost\/1"/)
+
   assert.match(chip, /audio-chip__play/)
-  assert.match(chip, /audio-chip__filename[^>]*>voice-message\.webm</)
-  assert.match(chip, /audio-chip__transcript"><\/span>/)
+  assert.match(chip, /<canvas class="audio-chip__wave[^"]*"[^>]*data-audio-chip-target="wave"/)
+  assert.match(chip, /audio-chip__duration[^>]*data-audio-chip-target="duration"/)
+
+  // NO filename element anywhere in the chip.
+  assert.doesNotMatch(chip, /audio-chip__filename/)
 })
 
-test("audioChipTemplate wires delete through composer#fileUnpicked with the index", () => {
-  const chip = audioChipTemplate({ filename: "clip.ogg", index: 2 })
+test("only the X remove button deletes, via composer#fileUnpicked with the index param", () => {
+  const chip = audioChipTemplate({ index: 2 })
 
-  assert.match(chip, /data-action="composer#fileUnpicked"/)
+  assert.equal((chip.match(/data-action="composer#fileUnpicked"/g) || []).length, 1)
+  assert.match(chip, /audio-chip__remove[^>]*data-action="composer#fileUnpicked"/)
   assert.match(chip, /data-composer-index-param="2"/)
+
+  // Neither the chip root nor the play button is a delete trigger.
+  assert.doesNotMatch(chip, /^<button/)
+  assert.doesNotMatch(chip, /audio-chip__play[^>]*data-action="composer#fileUnpicked"/)
 })
 
-test("audioChipTemplate escapes the filename", () => {
-  const chip = audioChipTemplate({ filename: '<script>alert("x")</script>.mp3', index: 0 })
+test("play button toggles the chip's own audio-chip controller instance", () => {
+  const chip = audioChipTemplate({ index: 0, src: "blob:http://localhost/1" })
+
+  assert.match(chip, /audio-chip__play[^>]*data-action="audio-chip#toggle"/)
+  assert.match(chip, /data-audio-chip-target="wave"/)
+  assert.match(chip, /data-audio-chip-target="duration"/)
+})
+
+test("audioChipTemplate escapes the src URL", () => {
+  const chip = audioChipTemplate({ index: 0, src: '"><script>alert("x")</script>' })
 
   assert.doesNotMatch(chip, /<script>/)
-  assert.match(chip, /audio-chip__filename[^>]*>&lt;script&gt;/)
+  assert.match(chip, /data-audio-chip-src-value="&quot;&gt;/)
 })
 
-test("audioChipTemplate transcript slot ships empty in S1", () => {
-  const chip = audioChipTemplate({ filename: "clip.mp3", index: 0 })
+test("src attribute is optional — the log partial supplies its own src", () => {
+  const chip = audioChipTemplate({ index: 0 })
 
-  // Empty element, no inner text — gateway STT text is out of scope for S1.
-  assert.doesNotMatch(chip, /audio-chip__transcript">[^<]+</)
+  assert.doesNotMatch(chip, /data-audio-chip-src-value/)
 })

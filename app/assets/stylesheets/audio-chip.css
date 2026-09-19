@@ -1,11 +1,13 @@
-/* Shared audio chip (PM12-S1) — same markup in the composer pending-file
-   preview (lib/audio_chip.js) and the log (messages/_audio_chip.html.erb).
-   Campfire tokens only. NOTE: stylesheets load alphabetically, so buttons.css
-   wins ties — the composer chip (a .btn--plain button) sets its chrome via
-   --btn-* custom properties instead of border/padding overrides. */
+/* Shared audio chip (PM12-S1 → PM16-B/C) — same markup in the composer
+   pending-audio preview (lib/audio_chip.js) and the log
+   (messages/_audio_chip.html.erb). Campfire tokens only. The composer chip
+   hosts its own audio-chip controller instance; its play/X buttons are
+   .btn--plain icon buttons. */
 
 .audio-chip {
-  --chip-inline-size: 28ch;
+  /* PM16: wide enough for play + 120px waveform + duration + X without the
+     non-shrinkable canvas overflowing the border. */
+  --chip-inline-size: 42ch;
 
   align-items: center;
   border: 1px solid var(--color-border);
@@ -28,8 +30,32 @@
   }
 }
 
-.audio-chip__filename {
-  min-inline-size: 0;
+/* PM16-C/D: X delete button on the pending chip. Same minimal icon-button
+   treatment as .audio-chip__play — Campfire tokens only. */
+.audio-chip__remove {
+  background: url("remove-circle.svg") no-repeat center;
+  background-size: contain;
+  block-size: 1.15em;
+  flex-shrink: 0;
+  inline-size: 1.15em;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    filter: invert(100%);
+  }
+}
+
+/* PM16-B/C: client-side spectrogram bars, drawn on the canvas by
+   audio_chip_controller (AudioContext.decodeAudioData → normalized peaks).
+   Sized ~120x28, chip stays compact. */
+.audio-chip__wave {
+  block-size: 28px;
+  flex-shrink: 0;
+  inline-size: 120px;
 }
 
 .audio-chip__duration {
@@ -42,13 +68,10 @@
   display: none;
 }
 
-/* Composer preview chip: button chrome through --btn-* so .btn--plain
-   (loaded later) doesn't flatten the border and padding. */
-.composer__filelist .audio-chip {
-  --btn-border-color: var(--color-border);
-  --btn-padding: 0.35em 0.75em;
-
-  cursor: pointer;
+/* Composer preview chip host (PM16-B). The host collapses when no audio is
+   pending so it adds no gap inside the input row. */
+.composer__audio:empty {
+  display: none;
 }
 
 /* Log chip play state */
@@ -56,8 +79,11 @@
   background-image: url("pause.svg");
 }
 
-/* Mic button in the composer cluster (PM12-S1) */
-.composer__mic-btn {
+/* Mic button in the composer cluster (PM12-S1). PM16-D: the same rule now
+   covers the auto-voice button so its hover matches the sibling composer
+   icon buttons — no bespoke --hover-filter anywhere. */
+.composer__mic-btn,
+.composer__auto-voice-btn {
   --hover-filter: brightness(0.85);
 
   @media (any-hover: hover) {

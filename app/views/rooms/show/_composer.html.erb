@@ -16,6 +16,11 @@
               <div class="flex align-end gap full-width">
                 <%= image_tag "messages-outlined.svg", size: 22, aria: { hidden: "true" }, class: "composer__input-hint colorize--black", style: "view-transition-name: input-btn;", data: { composer_target: "inputHint", default_src: image_path("messages-outlined.svg"), recording_src: image_path("mic.svg") } %>
 
+                <%# PM16-B: pending voice chips render here (right of the hint,
+                    inside the input row). Filled by composer_controller
+                    #renderAudioChips; ships empty. %>
+                <div class="composer__audio flex flex--align-center gap-half flex-item-no-shrink"></div>
+
                 <div class="flex flex-column flex-item-grow min-width gap">
                   <%= form.rich_text_area :body,
                         rows: 1,

@@ -22,7 +22,6 @@ class Messages::AttachmentPresentation
     def render_audio_chip
       context.render partial: "messages/audio_chip", locals: {
         message: message,
-        filename: filename,
         transcript: Rails.cache.read([ "audio-transcript", message.id ]).to_s
       }
     end

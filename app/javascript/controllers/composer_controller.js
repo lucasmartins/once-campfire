@@ -14,6 +14,8 @@ export default class extends Controller {
   #files = []
   #recorder = null
   #recorderChunks = []
+  // PM16-B: object URLs feeding the pending audio chips, url → file.
+  #audioObjectURLs = new Map()
 
   connect() {
     this.#registerTestHook()
@@ -275,6 +277,8 @@ export default class extends Controller {
   async #submitFiles() {
     const files = this.#files
 
+    // PM16-B: chips go away with the send — their object URLs are released
+    // inside #updateFileList below.
     this.#files = []
     this.#updateFileList()
 
@@ -304,11 +308,24 @@ export default class extends Controller {
     this.textTarget.value = ""
   }
 
+  // PM16-B: pending AUDIO chips render inside the composer input row (the
+  // .composer__audio host, right of the input hint), not .composer__filelist.
+  // #files bookkeeping is unchanged — paperclip/drop/paste/attachAudio all
+  // feed the same pending-files flow; non-audio files still render as
+  // .composer__file rows in the filelist. Each audio chip hosts its own
+  // audio-chip controller instance playing the pending file through a local
+  // object URL; URLs are revoked when their file leaves the pending set
+  // (unpick or send).
   #updateFileList() {
     this.#files.sort((a, b) => a.name.localeCompare(b.name))
 
-    const fileNodes = this.#files.map((file, index) => {
-      if (isAudio(file)) return this.#audioFileNode(file, index)
+    const audioFiles = this.#files.filter(file => isAudio(file))
+    const regularFiles = this.#files.filter(file => !isAudio(file))
+
+    this.#renderAudioChips(audioFiles)
+
+    const fileNodes = regularFiles.map(file => {
+      const originalIndex = this.#files.indexOf(file)
 
       const filename = file.name.split(".").slice(0, -1).join(".")
       const extension = file.name.split(".").pop()
@@ -317,9 +334,9 @@ export default class extends Controller {
       node.setAttribute("type","button")
       node.setAttribute("style","gap: 0")
       node.dataset.action = "composer#fileUnpicked"
-      node.dataset.composerIndexParam = index
+      node.dataset.composerIndexParam = originalIndex
       node.className = "btn btn--plain composer__file txt-normal position-relative unpad flex-column"
-      node.innerHTML = file.type.match(/^image\/.*/) ? `<img role="presentation" class="flex-item-no-shrink composer__file-thumbnail" src="${URL.createObjectURL(file)}">` : `<span class="composer__file-thumbnail composer__file-thumbnail--common colorize--black"></span>`
+      node.innerHTML = file.type.match(/^image\//) ? `<img role="presentation" class="flex-item-no-shrink composer__file-thumbnail" src="${URL.createObjectURL(file)}">` : `<span class="composer__file-thumbnail composer__file-thumbnail--common colorize--black"></span>`
       node.innerHTML += `<span class="pad-inline txt-small flex align-center max-width composer__file-caption"><span class="overflow-ellipsis">${escapeHTML(filename)}.</span><span class="flex-item-no-shrink">${escapeHTML(extension)}</span></span>`
 
       return node
@@ -328,11 +345,40 @@ export default class extends Controller {
     this.fileListTarget.replaceChildren(...fileNodes)
   }
 
-  #audioFileNode(file, index) {
-    const template = document.createElement("template")
-    template.innerHTML = audioChipTemplate({ filename: file.name, index }).trim()
+  #renderAudioChips(audioFiles) {
+    const host = this.#audioChipHost()
+    if (!host) return
 
-    return template.content.firstChild
+    // Chips are replaced wholesale each render, so their audio-chip
+    // controllers disconnect and rebuild — every render mints fresh object
+    // URLs. Superseded URLs (file unpicked, sent, or just re-rendered) are
+    // revoked here so nothing leaks.
+    const previousURLs = this.#audioObjectURLs
+    this.#audioObjectURLs = new Map()
+
+    const nodes = audioFiles.map(file => {
+      const index = this.#files.indexOf(file)
+      const url = URL.createObjectURL(file)
+      this.#audioObjectURLs.set(url, file)
+
+      const template = document.createElement("template")
+      template.innerHTML = audioChipTemplate({ index, src: url }).trim()
+
+      return template.content.firstChild
+    })
+
+    for (const url of previousURLs.keys()) {
+      URL.revokeObjectURL(url)
+    }
+
+    host.replaceChildren(...nodes)
+  }
+
+  // The pending-audio chip host ships in _composer.html.erb inside the
+  // .composer__input row, right of the input hint.
+  #audioChipHost() {
+    const input = this.element.querySelector(".composer__input")
+    return input && input.querySelector(".composer__audio")
   }
 
   #pendingUploadProgress(filename, percent=0) {

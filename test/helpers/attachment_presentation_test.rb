@@ -8,8 +8,10 @@ class Messages::AttachmentPresentationTest < ActionView::TestCase
     presentation = view.message_presentation(message)
 
     assert_match /class="[^"]*audio-chip\b/, presentation
-    assert_match /audio-chip__filename/, presentation
+    assert_no_match /audio-chip__filename/, presentation
     assert_match /audio-chip__transcript/, presentation
+    assert_match /audio-chip__duration/, presentation
+    assert_match /canvas class="audio-chip__wave/, presentation
     assert_match /Play audio/, presentation
     assert_no_match /message__action-btn/, presentation
     assert_no_match /Download /, presentation
@@ -41,7 +43,8 @@ class Messages::AttachmentPresentationTest < ActionView::TestCase
 
     presentation = view.message_presentation(message)
 
-    assert_match /audio-chip__filename/, presentation
+    assert_match /audio-chip__duration/, presentation
+    assert_no_match /audio-chip__filename/, presentation
     assert_no_match /message__action-btn/, presentation
   end
 
